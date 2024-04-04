@@ -1,6 +1,4 @@
 #include <iostream>
-#include <map>
-#include <string>
 #include <vector>
 
 unsigned int two_to_one_d_map(const unsigned int row_len,
