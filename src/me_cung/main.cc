@@ -1,154 +1,68 @@
 #include <iostream>
-#include <map>
 #include <queue>
-#include <set>
 #include <vector>
 
-enum class Tile { Wall, Path };
+using namespace std;
 
-struct Coordination {
-  unsigned int x;
-  unsigned int y;
+const int MAX_INT = (-1) >> 1;
 
-  bool is_movable_in(const std::vector<std::vector<Tile>> &maze) const {
-    return maze[y][x] == Tile::Path;
+bool isValid(int x, int y, int m, int n, const vector<vector<int>> &grid,
+             vector<vector<bool>> &visited) {
+  return (0 <= x && x < m) && (0 <= y && y < n) && grid[x][y] == 1 &&
+         !visited[x][y];
+}
+
+int shortestPath(int m, int n, const vector<vector<int>> &grid, int x1, int y1,
+                 int x2, int y2) {
+  vector<pair<int, int>> directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+  priority_queue<pair<int, pair<int, int>>, vector<pair<int, pair<int, int>>>,
+                 greater<pair<int, pair<int, int>>>>
+      pq;
+  pq.push({0, {x1, y1}});
+
+  vector<vector<bool>> visited(m, vector<bool>(n, false));
+  visited[x1][y1] = true;
+
+  while (!pq.empty()) {
+    int distance = pq.top().first;
+    int x = pq.top().second.first;
+    int y = pq.top().second.second;
+    pq.pop();
+
+    if (x == x2 && y == y2) {
+      return distance + 1;
+    }
+
+    for (const auto &dir : directions) {
+      int new_x = x + dir.first;
+      int new_y = y + dir.second;
+
+      if (isValid(new_x, new_y, m, n, grid, visited)) {
+        pq.push({distance + 1, {new_x, new_y}});
+        visited[new_x][new_y] = true;
+      }
+    }
   }
 
-  unsigned int mahattan_distance(const Coordination &other) const {
-    return std::abs((long)x - (long)other.x) -
-           std::abs((long)y - (long)other.y);
-  }
-
-  bool operator==(const Coordination &other) const {
-    return x == other.x && y == other.y;
-  }
-  bool operator<(const Coordination &other) const {
-    return (x + y) < (other.x + other.y);
-  }
-};
-
-struct Agent {
-  Coordination coordination;
-  unsigned int steps;
-  unsigned int priority_points;
-
-  bool operator<(const Agent &other) const {
-    return priority_points > other.priority_points;
-  }
-};
-
-using Maze = std::vector<std::vector<Tile>>;
-using StartingPoint = Coordination;
-using EndingPoint = Coordination;
-
-typedef std::priority_queue<Agent> Frontier;
-typedef std::set<Coordination> ExploredSet;
-typedef std::map<Coordination, Coordination> ParentMap;
-
-std::vector<Coordination> get_neighbors(const Agent &agent,
-                                        const unsigned int maze_height,
-                                        const unsigned int maze_width) {
-  std::vector<Coordination> neighbors;
-  neighbors.reserve(4);
-
-  unsigned int x = agent.coordination.x;
-  unsigned int y = agent.coordination.y;
-
-  if (x > 0) {
-    neighbors.push_back({x - 1, y});
-  }
-  if (x < (maze_width - 1)) {
-    neighbors.push_back({x + 1, y});
-  }
-  if (y > 0) {
-    neighbors.push_back({x, y - 1});
-  }
-  if (y < (maze_height - 1)) {
-    neighbors.push_back({x, y + 1});
-  }
-
-  return neighbors;
+  return -1; // No path found
 }
 
 int main() {
-  unsigned int maze_height = 0, maze_width = 0;
-  std::cin >> maze_height >> maze_width;
+  int m, n;
+  cin >> m >> n;
 
-  Maze maze(maze_height, std::vector<Tile>(maze_width, Tile::Wall));
-
-  for (unsigned int row_index = 0; row_index < maze_height; row_index += 1) {
-    for (unsigned int column_index = 0; column_index < maze_width;
-         column_index += 1) {
-      unsigned int value = 0;
-      std::cin >> value;
-
-      if (value == 1) {
-        maze[row_index][column_index] = Tile::Path;
-      }
+  vector<vector<int>> grid(m, vector<int>(n, 0));
+  for (int i = 0; i < m; ++i) {
+    for (int j = 0; j < n; ++j) {
+      cin >> grid[i][j];
     }
   }
 
-  StartingPoint starting_point = {0, 0};
-  std::cin >> starting_point.x >> starting_point.y;
+  int x1, y1, x2, y2;
+  cin >> x1 >> y1 >> x2 >> y2;
 
-  EndingPoint ending_point = {0, 0};
-  std::cin >> ending_point.x >> ending_point.y;
+  int shortestDistance = shortestPath(m, n, grid, x1, y1, x2, y2);
+  cout << shortestDistance << endl;
 
-  Frontier frontier;
-  ExploredSet explored_set;
-  ParentMap parent_map;
-  Agent final_agent;
-  bool is_solved = false;
-
-  Agent initial_agent;
-  initial_agent.coordination = starting_point;
-  initial_agent.steps = 0;
-  initial_agent.priority_points =
-      initial_agent.coordination.mahattan_distance(ending_point);
-  frontier.push(initial_agent);
-
-  while (!frontier.empty()) {
-    Agent agent = frontier.top();
-    frontier.pop();
-    explored_set.insert(agent.coordination);
-
-    if (agent.coordination == ending_point) {
-      final_agent = agent;
-      is_solved = true;
-      break;
-    }
-
-    for (const auto &neighbor : get_neighbors(agent, maze_height, maze_width)) {
-      if (!explored_set.count(neighbor) && neighbor.is_movable_in(maze)) {
-        unsigned int new_steps = agent.steps + 1;
-        unsigned int new_priority =
-            new_steps + neighbor.mahattan_distance(ending_point);
-        Agent new_agent;
-        new_agent.coordination = neighbor;
-        new_agent.steps = new_steps;
-        new_agent.priority_points = new_priority;
-        frontier.push(new_agent);
-        parent_map[neighbor] = agent.coordination;
-      }
-    }
-  }
-
-  if (is_solved) {
-    std::vector<Coordination> path;
-    path.push_back(final_agent.coordination);
-    Coordination current = final_agent.coordination;
-    while (parent_map.count(current)) {
-      current = parent_map[current];
-      path.push_back(current);
-    }
-
-    for (const auto &x : path) {
-      std::cout << x.x << x.y << std::endl;
-    }
-
-    std::cout << path.size() << std::endl;
-    return 0;
-  }
-  std::cout << "-1\n" << std::flush;
   return 0;
 }
